@@ -7,7 +7,7 @@ multiplier = { "black" : 1, "brown" : 10, "red" : 100, "orange" : 1000, "yellow"
 # ENSURES: Proper 5 band parsed resistor coding
 def get_resistance(l):
   if(len(l) != 5):
-    raise ValueError
+    raise ValueError()
   return ((( values[l[0]] * 100 + values[l[1]] * 10 + values[l[2]]) * multiplier[l[3]]), tolerances[l[4]])
 
 

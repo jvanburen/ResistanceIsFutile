@@ -1,10 +1,12 @@
-from __future__ import with_statement
+from __future__ import with_statement, division
 import cv2
 import sys
 import pprint
 import time
 import numpy as np
 import threading
+from scipy.ndimage import label
+import resist2 as colors
 
 class MyWebcam(threading.Thread):
     def __init__(self, vid):
@@ -26,13 +28,11 @@ class MyWebcam(threading.Thread):
         return image
 
 
-
-cascPath = './classifier/cascade.xml'
+cascPath = './resistor/cascade.xml'
 resCascade = cv2.CascadeClassifier(cascPath)
 
-
-width = 640
-height = 480
+width = 480
+height = 320
 
 video_capture = cv2.VideoCapture(0)
 video_capture.set(3, width)
@@ -41,15 +41,10 @@ video_capture.set(4, height)
 webcam = MyWebcam(video_capture)
 webcam.start()
 
-screen_center_x = width/2
-screen_center_y = height/2
+screen_center_x = width//2
+screen_center_y = height//2
 
-def compute_colour_distance(image, x, y, w, h, color):
-    part = image[x:x+w, y:y+h]
-    hsv = part.astype('float32') * 1./255
-    hsv = cv2.cvtColor(hsv, cv2.COLOR_BGR2HSV);
-    
-    
+
 
 def compute_blurriness_coeff(frame, cvtcolor=True):
     "WARNING: slow-ish!"
@@ -71,8 +66,6 @@ def compute_blurriness_coeff(frame, cvtcolor=True):
     gray = gray.reshape(-1)
 
     return 100./max(iter(gray))
-
-
 
 
 def test_camera(vid):
@@ -126,32 +119,72 @@ def get_clear_image(vid, threshold=(0,100), delay=0.005, verbosity=0):
 
 test_camera(video_capture)
 
+def segment_on_dt(a, img):
+    border = cv2.dilate(img, None, iterations=5)
+    border = border - cv2.erode(border, None)
+
+    dt = cv2.distanceTransform(img, 2, 3)
+    dt = ((dt - dt.min()) // (dt.max() - dt.min()) * 255).astype(np.uint8)
+    _, dt = cv2.threshold(dt, 180, 255, cv2.THRESH_BINARY)
+    lbl, ncc = label(dt)
+    lbl = lbl * (255/ncc)
+    # Completing the markers now. 
+    lbl[border == 255] = 255
+
+    #import pdb; pdb.set_trace()
+
+    lbl = lbl.astype(np.int32)
+    
+    cv2.watershed(a, lbl)
+
+    lbl[lbl == -1] = 0
+    lbl = lbl.astype(np.uint8)
+    return 255 - lbl
+    
+prev = []
 while True:
     ret, frame = webcam.read()
     
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
+    
     # features = []
     features = resCascade.detectMultiScale(
              gray,
-             scaleFactor=1.1,
-             minNeighbors=7,
-             minSize=(5, 5),
+             scaleFactor=1.3,
+             minNeighbors=33,
+             minSize=(8, 3),
+             maxSize=(width//4, height//4),
              flags=cv2.cv.CV_HAAR_SCALE_IMAGE
     )
     
     if len(features) > 0:
+        
        	x, y, w, h = max(features, key=lambda f: f[2]*f[3])
+        
+        img_gray = gray[x:x+width, y:y+height] 
+        _, img_bin = cv2.threshold(img_gray, 0, 255, cv2.THRESH_OTSU)
+        #img_bin = cv2.morphologyEx(img_bin, cv2.MORPH_OPEN, np.ones((3, 3), dtype=int))
+        result = segment_on_dt(frame[x:x+width, y:y+height], img_bin)
+        
+        gray[x:x+width, y:y+height] = result
+        
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        
        	# print x,y,w,h
     else:
         x, y, w, h = screen_center_x - 75, screen_center_y-28, 150, 56
     
-    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
+        
+    
     cv2.imshow('Video', frame)
     if cv2.waitKey(1) & 0xFF == ord('q'): break
+    prev = features
     
 
 # When everything is done, release the capture
 video_capture.release()
 cv2.destroyAllWindows()
+import time
+time.sleep(0.5)
 exit(0)
