@@ -31,8 +31,8 @@ class MyWebcam(threading.Thread):
 cascPath = './resistor/cascade.xml'
 resCascade = cv2.CascadeClassifier(cascPath)
 
-width = 480
-height = 320
+width = 600
+height = 480
 
 video_capture = cv2.VideoCapture(0)
 video_capture.set(3, width)
@@ -150,8 +150,8 @@ while True:
     # features = []
     features = resCascade.detectMultiScale(
              gray,
-             scaleFactor=1.3,
-             minNeighbors=33,
+             scaleFactor=1.1,
+             minNeighbors=50,
              minSize=(8, 3),
              maxSize=(width//4, height//4),
              flags=cv2.cv.CV_HAAR_SCALE_IMAGE
@@ -161,12 +161,12 @@ while True:
         
        	x, y, w, h = max(features, key=lambda f: f[2]*f[3])
         
-        img_gray = gray[x:x+width, y:y+height] 
-        _, img_bin = cv2.threshold(img_gray, 0, 255, cv2.THRESH_OTSU)
-        #img_bin = cv2.morphologyEx(img_bin, cv2.MORPH_OPEN, np.ones((3, 3), dtype=int))
-        result = segment_on_dt(frame[x:x+width, y:y+height], img_bin)
+        # img_gray = gray[x:x+width, y:y+height] 
+        # _, img_bin = cv2.threshold(img_gray, 0, 255, cv2.THRESH_OTSU)
+        # img_bin = cv2.morphologyEx(img_bin, cv2.MORPH_OPEN, np.ones((3, 3), dtype=int))
+        # result = segment_on_dt(frame[x:x+width, y:y+height], img_bin)
         
-        gray[x:x+width, y:y+height] = result
+        # gray[x:x+width, y:y+height] = result
         
         cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
         
